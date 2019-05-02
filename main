@@ -1,0 +1,1000 @@
+{
+ "cells": [
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# Traffic Light Classifier\n",
+    "---\n",
+    "\n",
+    "In this project, you’ll use your knowledge of computer vision techniques to build a classifier for images of traffic lights! You'll be given a dataset of traffic light images in which one of three lights is illuminated: red, yellow, or green.\n",
+    "\n",
+    "In this notebook, you'll pre-process these images, extract features that will help us distinguish the different types of images, and use those features to classify the traffic light images into three classes: red, yellow, or green. The tasks will be broken down into a few sections:\n",
+    "\n",
+    "1. **Loading and visualizing the data**. \n",
+    "      The first step in any classification task is to be familiar with your data; you'll need to load in the images of traffic lights and visualize them!\n",
+    "\n",
+    "2. **Pre-processing**. \n",
+    "    The input images and output labels need to be standardized. This way, you can analyze all the input images using the same classification pipeline, and you know what output to expect when you eventually classify a *new* image.\n",
+    "    \n",
+    "3. **Feature extraction**. \n",
+    "    Next, you'll extract some features from each image that will help distinguish and eventually classify these images.\n",
+    "   \n",
+    "4. **Classification and visualizing error**. \n",
+    "    Finally, you'll write one function that uses your features to classify *any* traffic light image. This function will take in an image and output a label. You'll also be given code to determine the accuracy of your classification model.    \n",
+    "    \n",
+    "5. **Evaluate your model**.\n",
+    "    To pass this project, your classifier must be >90% accurate and never classify any red lights as green; it's likely that you'll need to improve the accuracy of your classifier by changing existing features or adding new features. I'd also encourage you to try to get as close to 100% accuracy as possible!\n",
+    "    \n",
+    "Here are some sample images from the dataset (from left to right: red, green, and yellow traffic lights):\n",
+    "<img src=\"images/all_lights.png\" width=\"50%\" height=\"50%\">\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### *Here's what you need to know to complete the project:*\n",
+    "\n",
+    "Some template code has already been provided for you, but you'll need to implement additional code steps to successfully complete this project. Any code that is required to pass this project is marked with **'(IMPLEMENTATION)'** in the header. There are also a couple of questions about your thoughts as you work through this project, which are marked with **'(QUESTION)'** in the header. Make sure to answer all questions and to check your work against the [project rubric](https://review.udacity.com/#!/rubrics/1213/view) to make sure you complete the necessary classification steps!\n",
+    "\n",
+    "Your project submission will be evaluated based on the code implementations you provide, and on two main classification criteria.\n",
+    "Your complete traffic light classifier should have:\n",
+    "1. **Greater than 90% accuracy**\n",
+    "2. ***Never* classify red lights as green**\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# 1. Loading and Visualizing the Traffic Light Dataset\n",
+    "\n",
+    "This traffic light dataset consists of 1484 number of color images in 3 categories - red, yellow, and green. As with most human-sourced data, the data is not evenly distributed among the types. There are:\n",
+    "* 904 red traffic light images\n",
+    "* 536 green traffic light images\n",
+    "* 44 yellow traffic light images\n",
+    "\n",
+    "*Note: All images come from this [MIT self-driving car course](https://selfdrivingcars.mit.edu/) and are licensed under a [Creative Commons Attribution-ShareAlike 4.0 International License](https://creativecommons.org/licenses/by-sa/4.0/).*"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Import resources\n",
+    "\n",
+    "Before you get started on the project code, import the libraries and resources that you'll need."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 1,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "import cv2 # computer vision library\n",
+    "import helpers # helper functions\n",
+    "\n",
+    "import random\n",
+    "import numpy as np\n",
+    "import matplotlib.pyplot as plt\n",
+    "import matplotlib.image as mpimg # for loading in images\n",
+    "\n",
+    "%matplotlib inline"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Training and Testing Data\n",
+    "\n",
+    "All 1484 of the traffic light images are separated into training and testing datasets. \n",
+    "\n",
+    "* 80% of these images are training images, for you to use as you create a classifier.\n",
+    "* 20% are test images, which will be used to test the accuracy of your classifier.\n",
+    "* All images are pictures of 3-light traffic lights with one light illuminated.\n",
+    "\n",
+    "## Define the image directories\n",
+    "\n",
+    "First, we set some variables to keep track of some where our images are stored:\n",
+    "\n",
+    "    IMAGE_DIR_TRAINING: the directory where our training image data is stored\n",
+    "    IMAGE_DIR_TEST: the directory where our test image data is stored"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 2,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Image data directories\n",
+    "IMAGE_DIR_TRAINING = \"traffic_light_images/training/\"\n",
+    "IMAGE_DIR_TEST = \"traffic_light_images/test/\""
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Load the datasets\n",
+    "\n",
+    "These first few lines of code will load the training traffic light images and store all of them in a variable, `IMAGE_LIST`. This list contains the images and their associated label (\"red\", \"yellow\", \"green\"). \n",
+    "\n",
+    "You are encouraged to take a look at the `load_dataset` function in the helpers.py file. This will give you a good idea about how lots of image files can be read in from a directory using the [glob library](https://pymotw.com/2/glob/). The `load_dataset` function takes in the name of an image directory and returns a list of images and their associated labels. \n",
+    "\n",
+    "For example, the first image-label pair in `IMAGE_LIST` can be accessed by index: \n",
+    "``` IMAGE_LIST[0][:]```.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 3,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Using the load_dataset function in helpers.py\n",
+    "# Load training data\n",
+    "IMAGE_LIST = helpers.load_dataset(IMAGE_DIR_TRAINING)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Visualize the Data\n",
+    "\n",
+    "The first steps in analyzing any dataset are to 1. load the data and 2. look at the data. Seeing what it looks like will give you an idea of what to look for in the images, what kind of noise or inconsistencies you have to deal with, and so on. This will help you understand the image dataset, and **understanding a dataset is part of making predictions about the data**."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "### Visualize the input images\n",
+    "\n",
+    "Visualize and explore the image data! Write code to display an image in `IMAGE_LIST`:\n",
+    "* Display the image\n",
+    "* Print out the shape of the image \n",
+    "* Print out its corresponding label\n",
+    "\n",
+    "See if you can display at least one of each type of traffic light image – red, green, and yellow — and look at their similarities and differences."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 4,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Images summary:\n",
+      "\tNumber of images:  1187\n",
+      "\tNumber of red lights: 723\n",
+      "\tNumber of yellow lights: 35\n",
+      "\tNumber of green lights: 429\n",
+      "Image summary:\n",
+      "\tImage shape:  (63, 30, 3)\n",
+      "\tImage label:  yellow\n",
+      "Image summary:\n",
+      "\tImage shape:  (65, 34, 3)\n",
+      "\tImage label:  red\n",
+      "Image summary:\n",
+      "\tImage shape:  (46, 26, 3)\n",
+      "\tImage label:  green\n"
+     ]
+    },
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<matplotlib.figure.Figure at 0x7fb573e19128>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "def print_images_summary(image_list):\n",
+    "    \"\"\"Prints basic summary of an image list\"\"\"\n",
+    "    \n",
+    "    labels = [image[1] for image in image_list]\n",
+    "    colors = ['red', 'yellow', 'green']\n",
+    "    \n",
+    "    print('Images summary:')\n",
+    "    print('\\tNumber of images: ', len(image_list))\n",
+    "    for color in colors:\n",
+    "        print('\\tNumber of {} lights: {}'.format(color, labels.count(color)))\n",
+    "        \n",
+    "    return\n",
+    " \n",
+    "\n",
+    "def display_image_summary(image_list, image_no):\n",
+    "    \"\"\"Displays image from list of images\"\"\"\n",
+    "    \n",
+    "    image = image_list[image_no][0]\n",
+    "    image_label = image_list[image_no][1]\n",
+    "    \n",
+    "    print('Image summary:')\n",
+    "    print('\\tImage shape: ', image.shape)\n",
+    "    print('\\tImage label: ', image_label)\n",
+    "    plt.imshow(image)\n",
+    "    \n",
+    "    return\n",
+    "\n",
+    "\n",
+    "print_images_summary(IMAGE_LIST)\n",
+    "display_image_summary(IMAGE_LIST, 750)\n",
+    "display_image_summary(IMAGE_LIST, 20)\n",
+    "display_image_summary(IMAGE_LIST, 1000)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# 2. Pre-process the Data\n",
+    "\n",
+    "After loading in each image, you have to standardize the input and output!\n",
+    "\n",
+    "### Input\n",
+    "\n",
+    "This means that every input image should be in the same format, of the same size, and so on. We'll be creating features by performing the same analysis on every picture, and for a classification task like this, it's important that **similar images create similar features**! \n",
+    "\n",
+    "### Output\n",
+    "\n",
+    "We also need the output to be a label that is easy to read and easy to compare with other labels. It is good practice to convert categorical data like \"red\" and \"green\" to numerical data.\n",
+    "\n",
+    "A very common classification output is a 1D list that is the length of the number of classes - three in the case of red, yellow, and green lights - with the values 0 or 1 indicating which class a certain image is. For example, since we have three classes (red, yellow, and green), we can make a list with the order: [red value, yellow value, green value]. In general, order does not matter, we choose the order [red value, yellow value, green value] in this case to reflect the position of each light in descending vertical order.\n",
+    "\n",
+    "A red light should have the  label: [1, 0, 0]. Yellow should be: [0, 1, 0]. Green should be: [0, 0, 1]. These labels are called **one-hot encoded labels**.\n",
+    "\n",
+    "*(Note: one-hot encoding will be especially important when you work with [machine learning algorithms](https://machinelearningmastery.com/how-to-one-hot-encode-sequence-data-in-python/)).*\n",
+    "\n",
+    "<img src=\"images/processing_steps.png\" width=\"80%\" height=\"80%\">\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "<a id='task2'></a>\n",
+    "### (IMPLEMENTATION): Standardize the input images\n",
+    "\n",
+    "* Resize each image to the desired input size: 32x32px.\n",
+    "* (Optional) You may choose to crop, shift, or rotate the images in this step as well.\n",
+    "\n",
+    "It's very common to have square input sizes that can be rotated (and remain the same size), and analyzed in smaller, square patches. It's also important to make all your images the same size so that they can be sent through the same pipeline of classification steps!"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 5,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/plain": [
+       "<matplotlib.image.AxesImage at 0x7fb571d79ef0>"
+      ]
+     },
+     "execution_count": 5,
+     "metadata": {},
+     "output_type": "execute_result"
+    },
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<matplotlib.figure.Figure at 0x7fb574132550>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "def standardize_input(image):\n",
+    "    \"\"\"Standarizes RGB image\"\"\"\n",
+    "    \n",
+    "    image_copy = np.copy(image)\n",
+    "    image_cropped = image_copy[3:-3, 5:-5, :]\n",
+    "    image_resized = cv2.resize(image_cropped, (32, 32))\n",
+    "    \n",
+    "    return image_resized\n",
+    "\n",
+    "\n",
+    "plt.imshow(standardize_input(IMAGE_LIST[1000][0]))"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Standardize the output\n",
+    "\n",
+    "With each loaded image, we also specify the expected output. For this, we use **one-hot encoding**.\n",
+    "\n",
+    "* One-hot encode the labels. To do this, create an array of zeros representing each class of traffic light (red, yellow, green), and set the index of the expected class number to 1. \n",
+    "\n",
+    "Since we have three classes (red, yellow, and green), we have imposed an order of: [red value, yellow value, green value]. To one-hot encode, say, a yellow light, we would first initialize an array to [0, 0, 0] and change the middle value (the yellow value) to 1: [0, 1, 0].\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "<a id='task3'></a>\n",
+    "### (IMPLEMENTATION): Implement one-hot encoding"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 6,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def one_hot_encode(label):\n",
+    "    \"\"\"One hot encodes an image label\"\"\"\n",
+    "    \n",
+    "    one_hot_encoding = [0, 0, 0]\n",
+    "    allowed_labels = ['red', 'yellow', 'green']\n",
+    "    \n",
+    "    if label not in allowed_labels:\n",
+    "        raise ValueError('Unexpected label: {}'.format(label))\n",
+    "    elif label == 'red':\n",
+    "        one_hot_encoding[0] = 1\n",
+    "    elif label == 'yellow':\n",
+    "        one_hot_encoding[1] = 1\n",
+    "    elif label == 'green':\n",
+    "        one_hot_encoding[2] = 1\n",
+    "        \n",
+    "    return one_hot_encoding\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "### Testing as you Code\n",
+    "\n",
+    "After programming a function like this, it's a good idea to test it, and see if it produces the expected output. **In general, it's good practice to test code in small, functional pieces, after you write it**. This way, you can make sure that your code is correct as you continue to build a classifier, and you can identify any errors early on so that they don't compound.\n",
+    "\n",
+    "All test code can be found in the file `test_functions.py`. You are encouraged to look through that code and add your own testing code if you find it useful!\n",
+    "\n",
+    "One test function you'll find is: `test_one_hot(self, one_hot_function)` which takes in one argument, a one_hot_encode function, and tests its functionality. If your one_hot_label code does not work as expected, this test will print ot an error message that will tell you a bit about why your code failed. Once your code works, this should print out TEST PASSED."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 7,
+   "metadata": {},
+   "outputs": [
+    {
+     "data": {
+      "text/markdown": [
+       "**<span style=\"color: green;\">TEST PASSED</span>**"
+      ],
+      "text/plain": [
+       "<IPython.core.display.Markdown object>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Importing the tests\n",
+    "import test_functions\n",
+    "tests = test_functions.Tests()\n",
+    "\n",
+    "# Test for one_hot_encode function\n",
+    "tests.test_one_hot(one_hot_encode)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Construct a `STANDARDIZED_LIST` of input images and output labels.\n",
+    "\n",
+    "This function takes in a list of image-label pairs and outputs a **standardized** list of resized images and one-hot encoded labels.\n",
+    "\n",
+    "This uses the functions you defined above to standardize the input and output, so those functions must be complete for this standardization to work!\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 8,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def standardize(image_list):\n",
+    "    \n",
+    "    # Empty image data array\n",
+    "    standard_list = []\n",
+    "\n",
+    "    # Iterate through all the image-label pairs\n",
+    "    for item in image_list:\n",
+    "        image = item[0]\n",
+    "        label = item[1]\n",
+    "\n",
+    "        # Standardize the image\n",
+    "        standardized_im = standardize_input(image)\n",
+    "\n",
+    "        # One-hot encode the label\n",
+    "        one_hot_label = one_hot_encode(label)    \n",
+    "\n",
+    "        # Append the image, and it's one hot encoded label to the full, processed list of image data \n",
+    "        standard_list.append((standardized_im, one_hot_label))\n",
+    "        \n",
+    "    return standard_list\n",
+    "\n",
+    "# Standardize all training images\n",
+    "STANDARDIZED_LIST = standardize(IMAGE_LIST)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Visualize the standardized data\n",
+    "\n",
+    "Display a standardized image from STANDARDIZED_LIST and compare it with a non-standardized image from IMAGE_LIST. Note that their sizes and appearance are different!"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 9,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Image summary:\n",
+      "\tImage shape:  (32, 32, 3)\n",
+      "\tImage label:  [0, 0, 1]\n"
+     ]
+    },
+    {
+     "data": {
+      "image/png": "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\n",
+      "text/plain": [
+       "<matplotlib.figure.Figure at 0x7fb571d85278>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "display_image_summary(STANDARDIZED_LIST, 1000)\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# 3. Feature Extraction\n",
+    "\n",
+    "You'll be using what you now about color spaces, shape analysis, and feature construction to create features that help distinguish and classify the three types of traffic light images.\n",
+    "\n",
+    "You'll be tasked with creating **one feature** at a minimum (with the option to create more). The required feature is **a brightness feature using HSV color space**:\n",
+    "\n",
+    "1. A brightness feature.\n",
+    "    - Using HSV color space, create a feature that helps you identify the 3 different classes of traffic light.\n",
+    "    - You'll be asked some questions about what methods you tried to locate this traffic light, so, as you progress through this notebook, always be thinking about your approach: what works and what doesn't?\n",
+    "\n",
+    "2. (Optional): Create more features! \n",
+    "\n",
+    "Any more features that you create are up to you and should improve the accuracy of your traffic light classification algorithm! One thing to note is that, to pass this project you must **never classify a red light as a green light** because this creates a serious safety risk for a self-driving car. To avoid this misclassification, you might consider adding another feature that specifically distinguishes between red and green lights.\n",
+    "\n",
+    "These features will be combined near the end of his notebook to form a complete classification algorithm."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Creating a brightness feature \n",
+    "\n",
+    "There are a number of ways to create a brightness feature that will help you characterize images of traffic lights, and it will be up to you to decide on the best procedure to complete this step. You should visualize and test your code as you go.\n",
+    "\n",
+    "Pictured below is a sample pipeline for creating a brightness feature (from left to right: standardized image, HSV color-masked image, cropped image, brightness feature):\n",
+    "\n",
+    "<img src=\"images/feature_ext_steps.png\" width=\"70%\" height=\"70%\">\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## RGB to HSV conversion\n",
+    "\n",
+    "Below, a test image is converted from RGB to HSV colorspace and each component is displayed in an image."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 10,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Label [red, yellow, green]: [0, 0, 1]\n"
+     ]
+    },
+    {
+     "data": {
+      "text/plain": [
+       "<matplotlib.image.AxesImage at 0x7fb571bd7240>"
+      ]
+     },
+     "execution_count": 10,
+     "metadata": {},
+     "output_type": "execute_result"
+    },
+    {
+     "data": {
+      "image/png": "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eFQu3Ss9Hp3zUfnjs2fPZmNLS0tu2+Xl5Wzs/PnzbttHHnlk4H5Fed+7pniltaO2kr/NXjloKR5fe5mZudeQIqXHvbbRMYkMq1z2taLS9I1GY+BlRyXRvWtmkbbRvoqu8971KCqX7u1PL29L0sGDB924N26L3LtE4zrKVV48ui/yzoui58xVvBMIAAAAAACgBJgEAgAAAAAAKAEmgQAAAAAAAEqASSAAAAAAAIASYBIIAAAAAACgBJgEAgAAAAAAKIFwEsjMps3sI2b2CTP7azN7fe/3t5vZh83sYTN7l5kNXisPAALkIgCTgFwEYFKQjwAMotbHazYkfWNKadnM6pI+aGZ/IOlHJb0ppfROM/sVST8g6Ze9BU03Grrzycey8dTuZGOddtvtpNdWTkiSUvLjHSfeDhp3Os7KK/4cXK3h52tv2avra27blbV8fHV93V+vs0PrU36fp+dm3Pj8wkK+7fS027ZWyw/nRsMf6jNTdT8+k1/33Oys23aqnl+2BeOn3Wy58Q3nWC0vXXbbnj9zNhtbXVl12/7tw5924yMytFw0MzOju+66Kxs/diyfpxYXF91OHjx4MBubDcZKO8hzKysr2djFixfdtp7z58+78StXrgy87KWlJTe+upofaxsbG27b5eXlbGxzc9Nte/myf36MSrVadePRNhfh5cjIgpObo2VH67377ruzMe9clKTf/u3fduMjMrRctLy8rPvvv3+gTpiZG/f2e3Q9jcapF4/6VUQKrpneuqNt9nL3DTfc4Lb19kez2XTbRud8kRzpXVPWg3s9L79Kfo5ttfx7lyJtozHgxaNj4e2vunMvN2ZDyUeNRkO33nprdiXeM0d07+I+C41QtF4vXgme0aampgZetncvJ0lrzjOaF4vW2wieK6N71H379mVjMzP+8513PYrOrSjurTvaJu84Rrkmus/0cuylS5fcto899lg25l0TJOnChQtu/KrwnUCp6+qVoN77L0n6RklX777ukfTivtYIAAMgFwGYBOQiAJOCfARgEH19J5CZVc3s45LOSLpX0t9KupRSujpdf1LSzaPpIgB0kYsATAJyEYBJQT4CsF19TQKllNoppWdKOibpOZK+/Hovu15bM3uFmT1gZg9sbo7ube4A9r5h5aLobfAA4BlWLhrXxyQA7B2D5qOtuSj6qByAvWVb1cFSSpck/amk50ra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\n",
+      "text/plain": [
+       "<matplotlib.figure.Figure at 0x7fb571d92390>"
+      ]
+     },
+     "metadata": {},
+     "output_type": "display_data"
+    }
+   ],
+   "source": [
+    "# Convert and image to HSV colorspace\n",
+    "# Visualize the individual color channels\n",
+    "\n",
+    "image_num = 1000\n",
+    "test_im = STANDARDIZED_LIST[image_num][0]\n",
+    "test_label = STANDARDIZED_LIST[image_num][1]\n",
+    "\n",
+    "# Convert to HSV\n",
+    "hsv = cv2.cvtColor(test_im, cv2.COLOR_RGB2HSV)\n",
+    "\n",
+    "# Print image label\n",
+    "print('Label [red, yellow, green]: ' + str(test_label))\n",
+    "\n",
+    "# HSV channels\n",
+    "h = hsv[:,:,0]\n",
+    "s = hsv[:,:,1]\n",
+    "v = hsv[:,:,2]\n",
+    "\n",
+    "# Plot the original image and the three channels\n",
+    "f, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(20,10))\n",
+    "ax1.set_title('Standardized image')\n",
+    "ax1.imshow(test_im)\n",
+    "ax2.set_title('H channel')\n",
+    "ax2.imshow(h, cmap='gray')\n",
+    "ax3.set_title('S channel')\n",
+    "ax3.imshow(s, cmap='gray')\n",
+    "ax4.set_title('V channel')\n",
+    "ax4.imshow(v, cmap='gray')\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "<a id='task7'></a>\n",
+    "### (IMPLEMENTATION): Create a brightness feature that uses HSV color space\n",
+    "\n",
+    "Write a function that takes in an RGB image and returns a 1D feature vector and/or single value that will help classify an image of a traffic light. The only requirement is that this function should apply an HSV colorspace transformation, the rest is up to you. \n",
+    "\n",
+    "From this feature, you should be able to estimate an image's label and classify it as either a red, green, or yellow traffic light. You may also define helper functions if they simplify your code."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 11,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def feature_brightness(hsv_image):\n",
+    "    \"\"\"Creates a brightness feature using HSV color space\"\"\"\n",
+    "    \n",
+    "    # Extract Value channel\n",
+    "    v = hsv_image[:,:,2]\n",
+    "\n",
+    "    # Define regions\n",
+    "    red_region = v[:11, 5:25]\n",
+    "    yellow_region = v[10:21, 5:25]\n",
+    "    green_region = v[21:, 5:25]\n",
+    "    regions = [red_region, yellow_region, green_region]\n",
+    "    \n",
+    "    # Output average brightness for all three regions\n",
+    "    averages = [np.average(region) for region in regions]\n",
+    "    \n",
+    "    return averages\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "collapsed": true
+   },
+   "source": [
+    "## (Optional) Create more features to help accurately label the traffic light images"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 12,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def rgb_to_hsv(rgb_image):\n",
+    "    \"\"\"Converts RGB color space to HSV\"\"\"\n",
+    "    \n",
+    "    return cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)\n",
+    "\n",
+    "\n",
+    "def flatten_3d_to_2d(vector_3d):\n",
+    "    \"\"\"Flattens 3D vector into 2D vector\"\"\"\n",
+    "    \n",
+    "    np_vector = np.array(vector_3d)\n",
+    "    \n",
+    "    return np_vector.reshape(-1, np_vector.shape[-1])\n",
+    "\n",
+    "\n",
+    "def mask_hsv_image(hsv_image, lower_value, upper_value, avg_sat):\n",
+    "    \"\"\"Masks image with specific saturation values\"\"\"\n",
+    "    \n",
+    "    # ranges of specific color in HSV\n",
+    "    lower_value = np.array([lower_value, avg_sat, 140])\n",
+    "    upper_value = np.array([upper_value, 245, 245])\n",
+    "    \n",
+    "    # Threshold the HSV image to get only specific colors\n",
+    "    mask = cv2.inRange(hsv_image, lower_value, upper_value)\n",
+    "    \n",
+    "    # Bitwise-AND mask and HSV image\n",
+    "    masked_hsv_image = cv2.bitwise_and(hsv_image, hsv_image, mask=mask)\n",
+    "    \n",
+    "    return masked_hsv_image\n",
+    "\n",
+    "\n",
+    "def apply_saturation_masks(hsv_image):\n",
+    "    \"\"\"Applies saturation masks\"\"\"\n",
+    "    \n",
+    "    # Extract Saturation channel\n",
+    "    s = hsv_image[:,:,1]\n",
+    "    \n",
+    "    # Average Saturation\n",
+    "    avg_sat = np.average(s)\n",
+    "    # Correction\n",
+    "    avg_sat = int(avg_sat * 1.3)\n",
+    "    \n",
+    "    # Saturation masking\n",
+    "    red_masked_image = mask_hsv_image(hsv_image, 150, 180, avg_sat)\n",
+    "    green_masked_image = mask_hsv_image(hsv_image, 70, 100, avg_sat)\n",
+    "    yellow_masked_image = mask_hsv_image(hsv_image, 10, 60, avg_sat)\n",
+    "\n",
+    "    return (red_masked_image, yellow_masked_image, green_masked_image)\n",
+    "\n",
+    "\n",
+    "def feature_saturation(hsv_image):\n",
+    "    \"\"\"Creates a saturation feature using HSV color space\"\"\"\n",
+    "    \n",
+    "    saturation_layers = apply_saturation_masks(hsv_image)\n",
+    "    \n",
+    "    saturation_aggregation = []\n",
+    "    for saturation_layer in saturation_layers:\n",
+    "        saturation_aggregation.append(np.sum(list(map(lambda pixel: np.sum(pixel) != 0, flatten_3d_to_2d(saturation_layer)))))\n",
+    "\n",
+    "    return saturation_aggregation\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## (QUESTION 1): How do the features you made help you distinguish between the 3 classes of traffic light images?"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Answer:**\n",
+    "Brightness feature helps to distinguish color based on assumption of light being more bright than the noise in the image.\n",
+    "Saturation feature helps to distinguish between 3 classes in a way it applies pixel counters\n",
+    "over masked images. On masked images there are mostly 0(black) pixels, so pixels with any\n",
+    "other values count."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "collapsed": true
+   },
+   "source": [
+    "# 4. Classification and Visualizing Error\n",
+    "\n",
+    "Using all of your features, write a function that takes in an RGB image and, using your extracted features, outputs whether a light is red, green or yellow as a one-hot encoded label. This classification function should be able to classify any image of a traffic light!\n",
+    "\n",
+    "You are encouraged to write any helper functions or visualization code that you may need, but for testing the accuracy, make sure that this `estimate_label` function returns a one-hot encoded label."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "<a id='task8'></a>\n",
+    "### (IMPLEMENTATION): Build a complete classifier "
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 13,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "def estimate_label(rgb_image):\n",
+    "    \"\"\"Estimates label of a given traffic light RGB image\"\"\"\n",
+    "    \n",
+    "    # Standarization: -> Crop -> Resize\n",
+    "    standarized_image = standardize_input(rgb_image)\n",
+    "    \n",
+    "    # Colorspace converstion: -> RGB -> HSV\n",
+    "    hsv_image = rgb_to_hsv(standarized_image)\n",
+    "    \n",
+    "    # Extract features: -> Feature Brightness -> Feature Saturation\n",
+    "    feature_bri = feature_brightness(hsv_image)\n",
+    "    feature_sat = feature_saturation(hsv_image)\n",
+    "    \n",
+    "    # Feature combination formula\n",
+    "    feature_combined = np.array(feature_bri) + 0.5 * np.array(feature_sat)\n",
+    "    \n",
+    "    \n",
+    "    predicted_label = list(map(lambda x: x == max(feature_combined), feature_combined))\n",
+    "    \n",
+    "    return predicted_label   \n",
+    "    "
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Testing the classifier\n",
+    "\n",
+    "Here is where we test your classification algorithm using our test set of data that we set aside at the beginning of the notebook! This project will be complete once you've pogrammed a \"good\" classifier.\n",
+    "\n",
+    "A \"good\" classifier in this case should meet the following criteria (and once it does, feel free to submit your project):\n",
+    "1. Get above 90% classification accuracy.\n",
+    "2. Never classify a red light as a green light. \n",
+    "\n",
+    "### Test dataset\n",
+    "\n",
+    "Below, we load in the test dataset, standardize it using the `standardize` function you defined above, and then **shuffle** it; this ensures that order will not play a role in testing accuracy.\n"
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 14,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Using the load_dataset function in helpers.py\n",
+    "# Load test data\n",
+    "TEST_IMAGE_LIST = helpers.load_dataset(IMAGE_DIR_TEST)\n",
+    "\n",
+    "# Standardize the test data\n",
+    "STANDARDIZED_TEST_LIST = standardize(TEST_IMAGE_LIST)\n",
+    "\n",
+    "# Shuffle the standardized test data\n",
+    "random.shuffle(STANDARDIZED_TEST_LIST)"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Determine the Accuracy\n",
+    "\n",
+    "Compare the output of your classification algorithm (a.k.a. your \"model\") with the true labels and determine the accuracy.\n",
+    "\n",
+    "This code stores all the misclassified images, their predicted labels, and their true labels, in a list called `MISCLASSIFIED`. This code is used for testing and *should not be changed*."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 15,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "Accuracy: 1.0\n",
+      "Number of misclassified images = 0 out of 297\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Constructs a list of misclassified images given a list of test images and their labels\n",
+    "# This will throw an AssertionError if labels are not standardized (one-hot encoded)\n",
+    "\n",
+    "def get_misclassified_images(test_images):\n",
+    "    # Track misclassified images by placing them into a list\n",
+    "    misclassified_images_labels = []\n",
+    "\n",
+    "    # Iterate through all the test images\n",
+    "    # Classify each image and compare to the true label\n",
+    "    for image in test_images:\n",
+    "\n",
+    "        # Get true data\n",
+    "        im = image[0]\n",
+    "        true_label = image[1]\n",
+    "        assert(len(true_label) == 3), \"The true_label is not the expected length (3).\"\n",
+    "\n",
+    "        # Get predicted label from your classifier\n",
+    "        predicted_label = estimate_label(im)\n",
+    "        assert(len(predicted_label) == 3), \"The predicted_label is not the expected length (3).\"\n",
+    "\n",
+    "        # Compare true and predicted labels \n",
+    "        if(predicted_label != true_label):\n",
+    "            # If these labels are not equal, the image has been misclassified\n",
+    "            misclassified_images_labels.append((im, predicted_label, true_label))\n",
+    "            \n",
+    "    # Return the list of misclassified [image, predicted_label, true_label] values\n",
+    "    return misclassified_images_labels\n",
+    "\n",
+    "\n",
+    "# Find all misclassified images in a given test set\n",
+    "MISCLASSIFIED = get_misclassified_images(STANDARDIZED_TEST_LIST)\n",
+    "\n",
+    "# Accuracy calculations\n",
+    "total = len(STANDARDIZED_TEST_LIST)\n",
+    "num_correct = total - len(MISCLASSIFIED)\n",
+    "accuracy = num_correct/total\n",
+    "\n",
+    "print('Accuracy: ' + str(accuracy))\n",
+    "print(\"Number of misclassified images = \" + str(len(MISCLASSIFIED)) +' out of '+ str(total))\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "<a id='task9'></a>\n",
+    "### Visualize the misclassified images\n",
+    "\n",
+    "Visualize some of the images you classified wrong (in the `MISCLASSIFIED` list) and note any qualities that make them difficult to classify. This will help you identify any weaknesses in your classification algorithm."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 16,
+   "metadata": {},
+   "outputs": [],
+   "source": [
+    "# Unfortunately my algorithm produces no missclassified images :o"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "---\n",
+    "<a id='question2'></a>\n",
+    "## (Question 2): After visualizing these misclassifications, what weaknesses do you think your classification algorithm has? Please note at least two."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "**Answer:** Main weakness is that regions in saturation and brightness feature are typed by hand. Algorithm may fail with different set, where traffic lights images are not extracted properly."
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "## Test if you classify any red lights as green\n",
+    "\n",
+    "**To pass this project, you must not classify any red lights as green!** Classifying red lights as green would cause a car to drive through a red traffic light, so this red-as-green error is very dangerous in the real world. \n",
+    "\n",
+    "The code below lets you test to see if you've misclassified any red lights as green in the test set. **This test assumes that `MISCLASSIFIED` is a list of tuples with the order: [misclassified_image, predicted_label, true_label].**\n",
+    "\n",
+    "Note: this is not an all encompassing test, but its a good indicator that, if you pass, you are on the right track! This iterates through your list of misclassified examples and checks to see if any red traffic lights have been mistakenly labelled [0, 1, 0] (green)."
+   ]
+  },
+  {
+   "cell_type": "code",
+   "execution_count": 17,
+   "metadata": {},
+   "outputs": [
+    {
+     "name": "stdout",
+     "output_type": "stream",
+     "text": [
+      "MISCLASSIFIED may not have been populated with images.\n"
+     ]
+    }
+   ],
+   "source": [
+    "# Importing the tests\n",
+    "import test_functions\n",
+    "tests = test_functions.Tests()\n",
+    "\n",
+    "if(len(MISCLASSIFIED) > 0):\n",
+    "    # Test code for one_hot_encode function\n",
+    "    tests.test_red_as_green(MISCLASSIFIED)\n",
+    "else:\n",
+    "    print(\"MISCLASSIFIED may not have been populated with images.\")\n"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {},
+   "source": [
+    "# 5. Improve your algorithm!\n",
+    "\n",
+    "**Submit your project after you have completed all implementations, answered all questions, AND when you've met the two criteria:**\n",
+    "1. Greater than 90% accuracy classification\n",
+    "2. No red lights classified as green\n",
+    "\n",
+    "If you did not meet these requirements (which is common on the first attempt!), revisit your algorithm and tweak it to improve light recognition -- this could mean changing the brightness feature, performing some background subtraction, or adding another feature!\n",
+    "\n",
+    "---"
+   ]
+  },
+  {
+   "cell_type": "markdown",
+   "metadata": {
+    "collapsed": true
+   },
+   "source": [
+    "### Going Further (Optional Challenges)\n",
+    "\n",
+    "If you found this challenge easy, I suggest you go above and beyond! Here are a couple **optional** (meaning you do not need to implement these to submit and pass the project) suggestions:\n",
+    "* (Optional) Aim for >95% classification accuracy.\n",
+    "* (Optional) Some lights are in the shape of arrows; further classify the lights as round or arrow-shaped.\n",
+    "* (Optional) Add another feature and aim for as close to 100% accuracy as you can get!"
+   ]
+  }
+ ],
+ "metadata": {
+  "anaconda-cloud": {},
+  "kernelspec": {
+   "display_name": "Python 3",
+   "language": "python",
+   "name": "python3"
+  },
+  "language_info": {
+   "codemirror_mode": {
+    "name": "ipython",
+    "version": 3
+   },
+   "file_extension": ".py",
+   "mimetype": "text/x-python",
+   "name": "python",
+   "nbconvert_exporter": "python",
+   "pygments_lexer": "ipython3",
+   "version": "3.6.3"
+  }
+ },
+ "nbformat": 4,
+ "nbformat_minor": 2
+}
