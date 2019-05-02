@@ -1,529 +1,432 @@
-
-Traffic Light Classifier¶
-In this project, you’ll use your knowledge of computer vision techniques to build a classifier for images of traffic lights! You'll be given a dataset of traffic light images in which one of three lights is illuminated: red, yellow, or green.
-
-In this notebook, you'll pre-process these images, extract features that will help us distinguish the different types of images, and use those features to classify the traffic light images into three classes: red, yellow, or green. The tasks will be broken down into a few sections:
-
-Loading and visualizing the data. The first step in any classification task is to be familiar with your data; you'll need to load in the images of traffic lights and visualize them!
-
-Pre-processing. The input images and output labels need to be standardized. This way, you can analyze all the input images using the same classification pipeline, and you know what output to expect when you eventually classify a new image.
-
-Feature extraction. Next, you'll extract some features from each image that will help distinguish and eventually classify these images.
-
-Classification and visualizing error. Finally, you'll write one function that uses your features to classify any traffic light image. This function will take in an image and output a label. You'll also be given code to determine the accuracy of your classification model.
-
-Evaluate your model. To pass this project, your classifier must be >90% accurate and never classify any red lights as green; it's likely that you'll need to improve the accuracy of your classifier by changing existing features or adding new features. I'd also encourage you to try to get as close to 100% accuracy as possible!
-
-Here are some sample images from the dataset (from left to right: red, green, and yellow traffic lights): 
-
-Here's what you need to know to complete the project:
-Some template code has already been provided for you, but you'll need to implement additional code steps to successfully complete this project. Any code that is required to pass this project is marked with '(IMPLEMENTATION)' in the header. There are also a couple of questions about your thoughts as you work through this project, which are marked with '(QUESTION)' in the header. Make sure to answer all questions and to check your work against the project rubric to make sure you complete the necessary classification steps!
-
-Your project submission will be evaluated based on the code implementations you provide, and on two main classification criteria. Your complete traffic light classifier should have:
-
-Greater than 90% accuracy
-Never classify red lights as green
-1. Loading and Visualizing the Traffic Light Dataset
-This traffic light dataset consists of 1484 number of color images in 3 categories - red, yellow, and green. As with most human-sourced data, the data is not evenly distributed among the types. There are:
-
-904 red traffic light images
-536 green traffic light images
-44 yellow traffic light images
-Note: All images come from this MIT self-driving car course and are licensed under a Creative Commons Attribution-ShareAlike 4.0 International License.
-
-Import resources
-Before you get started on the project code, import the libraries and resources that you'll need.
-
-In [1]:
-import cv2 # computer vision library
-import helpers # helper functions
-
-import random
-import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.image as mpimg # for loading in images
-
-%matplotlib inline
-Training and Testing Data
-All 1484 of the traffic light images are separated into training and testing datasets.
-
-80% of these images are training images, for you to use as you create a classifier.
-20% are test images, which will be used to test the accuracy of your classifier.
-All images are pictures of 3-light traffic lights with one light illuminated.
-Define the image directories
-First, we set some variables to keep track of some where our images are stored:
-
-IMAGE_DIR_TRAINING: the directory where our training image data is stored
-IMAGE_DIR_TEST: the directory where our test image data is stored
-In [2]:
-# Image data directories
-IMAGE_DIR_TRAINING = "traffic_light_images/training/"
-IMAGE_DIR_TEST = "traffic_light_images/test/"
-Load the datasets
-These first few lines of code will load the training traffic light images and store all of them in a variable, IMAGE_LIST. This list contains the images and their associated label ("red", "yellow", "green").
-
-You are encouraged to take a look at the load_dataset function in the helpers.py file. This will give you a good idea about how lots of image files can be read in from a directory using the glob library. The load_dataset function takes in the name of an image directory and returns a list of images and their associated labels.
-
-For example, the first image-label pair in IMAGE_LIST can be accessed by index:  IMAGE_LIST[0][:].
-
-In [3]:
-# Using the load_dataset function in helpers.py
-# Load training data
-IMAGE_LIST = helpers.load_dataset(IMAGE_DIR_TRAINING)
-Visualize the Data
-The first steps in analyzing any dataset are to 1. load the data and 2. look at the data. Seeing what it looks like will give you an idea of what to look for in the images, what kind of noise or inconsistencies you have to deal with, and so on. This will help you understand the image dataset, and understanding a dataset is part of making predictions about the data.
-
-Visualize the input images
-Visualize and explore the image data! Write code to display an image in IMAGE_LIST:
-
-Display the image
-Print out the shape of the image
-Print out its corresponding label
-See if you can display at least one of each type of traffic light image – red, green, and yellow — and look at their similarities and differences.
-
-In [4]:
-def print_images_summary(image_list):
-    """Prints basic summary of an image list"""
-    
-    labels = [image[1] for image in image_list]
-    colors = ['red', 'yellow', 'green']
-    
-    print('Images summary:')
-    print('\tNumber of images: ', len(image_list))
-    for color in colors:
-        print('\tNumber of {} lights: {}'.format(color, labels.count(color)))
-        
-    return
- 
-
-def display_image_summary(image_list, image_no):
-    """Displays image from list of images"""
-    
-    image = image_list[image_no][0]
-    image_label = image_list[image_no][1]
-    
-    print('Image summary:')
-    print('\tImage shape: ', image.shape)
-    print('\tImage label: ', image_label)
-    plt.imshow(image)
-    
-    return
-
-
-print_images_summary(IMAGE_LIST)
-display_image_summary(IMAGE_LIST, 750)
-display_image_summary(IMAGE_LIST, 20)
-display_image_summary(IMAGE_LIST, 1000)
-Images summary:
-	Number of images:  1187
-	Number of red lights: 723
-	Number of yellow lights: 35
-	Number of green lights: 429
-Image summary:
-	Image shape:  (63, 30, 3)
-	Image label:  yellow
-Image summary:
-	Image shape:  (65, 34, 3)
-	Image label:  red
-Image summary:
-	Image shape:  (46, 26, 3)
-	Image label:  green
-
-2. Pre-process the Data
-After loading in each image, you have to standardize the input and output!
-
-Input
-This means that every input image should be in the same format, of the same size, and so on. We'll be creating features by performing the same analysis on every picture, and for a classification task like this, it's important that similar images create similar features!
-
-Output
-We also need the output to be a label that is easy to read and easy to compare with other labels. It is good practice to convert categorical data like "red" and "green" to numerical data.
-
-A very common classification output is a 1D list that is the length of the number of classes - three in the case of red, yellow, and green lights - with the values 0 or 1 indicating which class a certain image is. For example, since we have three classes (red, yellow, and green), we can make a list with the order: [red value, yellow value, green value]. In general, order does not matter, we choose the order [red value, yellow value, green value] in this case to reflect the position of each light in descending vertical order.
-
-A red light should have the label: [1, 0, 0]. Yellow should be: [0, 1, 0]. Green should be: [0, 0, 1]. These labels are called one-hot encoded labels.
-
-(Note: one-hot encoding will be especially important when you work with machine learning algorithms).
-
-
-
-
-(IMPLEMENTATION): Standardize the input images
-Resize each image to the desired input size: 32x32px.
-(Optional) You may choose to crop, shift, or rotate the images in this step as well.
-It's very common to have square input sizes that can be rotated (and remain the same size), and analyzed in smaller, square patches. It's also important to make all your images the same size so that they can be sent through the same pipeline of classification steps!
-
-In [5]:
-def standardize_input(image):
-    """Standarizes RGB image"""
-    
-    image_copy = np.copy(image)
-    image_cropped = image_copy[3:-3, 5:-5, :]
-    image_resized = cv2.resize(image_cropped, (32, 32))
-    
-    return image_resized
-
-
-plt.imshow(standardize_input(IMAGE_LIST[1000][0]))
-Out[5]:
-<matplotlib.image.AxesImage at 0x7fb571d79ef0>
-
-Standardize the output
-With each loaded image, we also specify the expected output. For this, we use one-hot encoding.
-
-One-hot encode the labels. To do this, create an array of zeros representing each class of traffic light (red, yellow, green), and set the index of the expected class number to 1.
-Since we have three classes (red, yellow, and green), we have imposed an order of: [red value, yellow value, green value]. To one-hot encode, say, a yellow light, we would first initialize an array to [0, 0, 0] and change the middle value (the yellow value) to 1: [0, 1, 0].
-
-
-(IMPLEMENTATION): Implement one-hot encoding
-In [6]:
-def one_hot_encode(label):
-    """One hot encodes an image label"""
-    
-    one_hot_encoding = [0, 0, 0]
-    allowed_labels = ['red', 'yellow', 'green']
-    
-    if label not in allowed_labels:
-        raise ValueError('Unexpected label: {}'.format(label))
-    elif label == 'red':
-        one_hot_encoding[0] = 1
-    elif label == 'yellow':
-        one_hot_encoding[1] = 1
-    elif label == 'green':
-        one_hot_encoding[2] = 1
-        
-    return one_hot_encoding
-Testing as you Code
-After programming a function like this, it's a good idea to test it, and see if it produces the expected output. In general, it's good practice to test code in small, functional pieces, after you write it. This way, you can make sure that your code is correct as you continue to build a classifier, and you can identify any errors early on so that they don't compound.
-
-All test code can be found in the file test_functions.py. You are encouraged to look through that code and add your own testing code if you find it useful!
-
-One test function you'll find is: test_one_hot(self, one_hot_function) which takes in one argument, a one_hot_encode function, and tests its functionality. If your one_hot_label code does not work as expected, this test will print ot an error message that will tell you a bit about why your code failed. Once your code works, this should print out TEST PASSED.
-
-In [7]:
-# Importing the tests
-import test_functions
-tests = test_functions.Tests()
-
-# Test for one_hot_encode function
-tests.test_one_hot(one_hot_encode)
-TEST PASSED
-
-Construct a STANDARDIZED_LIST of input images and output labels.
-This function takes in a list of image-label pairs and outputs a standardized list of resized images and one-hot encoded labels.
-
-This uses the functions you defined above to standardize the input and output, so those functions must be complete for this standardization to work!
-
-In [8]:
-def standardize(image_list):
-    
-    # Empty image data array
-    standard_list = []
-
-    # Iterate through all the image-label pairs
-    for item in image_list:
-        image = item[0]
-        label = item[1]
-
-        # Standardize the image
-        standardized_im = standardize_input(image)
-
-        # One-hot encode the label
-        one_hot_label = one_hot_encode(label)    
-
-        # Append the image, and it's one hot encoded label to the full, processed list of image data 
-        standard_list.append((standardized_im, one_hot_label))
-        
-    return standard_list
-
-# Standardize all training images
-STANDARDIZED_LIST = standardize(IMAGE_LIST)
-Visualize the standardized data
-Display a standardized image from STANDARDIZED_LIST and compare it with a non-standardized image from IMAGE_LIST. Note that their sizes and appearance are different!
-
-In [9]:
-display_image_summary(STANDARDIZED_LIST, 1000)
-Image summary:
-	Image shape:  (32, 32, 3)
-	Image label:  [0, 0, 1]
-
-3. Feature Extraction
-You'll be using what you now about color spaces, shape analysis, and feature construction to create features that help distinguish and classify the three types of traffic light images.
-
-You'll be tasked with creating one feature at a minimum (with the option to create more). The required feature is a brightness feature using HSV color space:
-
-A brightness feature.
-
-Using HSV color space, create a feature that helps you identify the 3 different classes of traffic light.
-You'll be asked some questions about what methods you tried to locate this traffic light, so, as you progress through this notebook, always be thinking about your approach: what works and what doesn't?
-(Optional): Create more features!
-
-Any more features that you create are up to you and should improve the accuracy of your traffic light classification algorithm! One thing to note is that, to pass this project you must never classify a red light as a green light because this creates a serious safety risk for a self-driving car. To avoid this misclassification, you might consider adding another feature that specifically distinguishes between red and green lights.
-
-These features will be combined near the end of his notebook to form a complete classification algorithm.
-
-Creating a brightness feature
-There are a number of ways to create a brightness feature that will help you characterize images of traffic lights, and it will be up to you to decide on the best procedure to complete this step. You should visualize and test your code as you go.
-
-Pictured below is a sample pipeline for creating a brightness feature (from left to right: standardized image, HSV color-masked image, cropped image, brightness feature):
-
-
-
-RGB to HSV conversion
-Below, a test image is converted from RGB to HSV colorspace and each component is displayed in an image.
-
-In [10]:
-# Convert and image to HSV colorspace
-# Visualize the individual color channels
-
-image_num = 1000
-test_im = STANDARDIZED_LIST[image_num][0]
-test_label = STANDARDIZED_LIST[image_num][1]
-
-# Convert to HSV
-hsv = cv2.cvtColor(test_im, cv2.COLOR_RGB2HSV)
-
-# Print image label
-print('Label [red, yellow, green]: ' + str(test_label))
-
-# HSV channels
-h = hsv[:,:,0]
-s = hsv[:,:,1]
-v = hsv[:,:,2]
-
-# Plot the original image and the three channels
-f, (ax1, ax2, ax3, ax4) = plt.subplots(1, 4, figsize=(20,10))
-ax1.set_title('Standardized image')
-ax1.imshow(test_im)
-ax2.set_title('H channel')
-ax2.imshow(h, cmap='gray')
-ax3.set_title('S channel')
-ax3.imshow(s, cmap='gray')
-ax4.set_title('V channel')
-ax4.imshow(v, cmap='gray')
-Label [red, yellow, green]: [0, 0, 1]
-Out[10]:
-<matplotlib.image.AxesImage at 0x7fb571bd7240>
-
-
-(IMPLEMENTATION): Create a brightness feature that uses HSV color space
-Write a function that takes in an RGB image and returns a 1D feature vector and/or single value that will help classify an image of a traffic light. The only requirement is that this function should apply an HSV colorspace transformation, the rest is up to you.
-
-From this feature, you should be able to estimate an image's label and classify it as either a red, green, or yellow traffic light. You may also define helper functions if they simplify your code.
-
 In [11]:
-def feature_brightness(hsv_image):
-    """Creates a brightness feature using HSV color space"""
-    
-    # Extract Value channel
-    v = hsv_image[:,:,2]
+import numpy as np
+import os
+import cv2
+from sklearn.model_selection import train_test_split
 
-    # Define regions
-    red_region = v[:11, 5:25]
-    yellow_region = v[10:21, 5:25]
-    green_region = v[21:, 5:25]
-    regions = [red_region, yellow_region, green_region]
-    
-    # Output average brightness for all three regions
-    averages = [np.average(region) for region in regions]
-    
-    return averages
-(Optional) Create more features to help accurately label the traffic light images
+def get_files(dir_path):
+    return [f for f in os.listdir(dir_path) if os.path.isfile(os.path.join(dir_path, f))]
+
+dataset_samples = []
+dataset_labels = []
+
+def read_dataset_dir(dir_path, label, dataset_samples, dataset_labels):
+    for filename in get_files(dir_path):
+        image = cv2.cvtColor(cv2.imread(os.path.join(dir_path, filename)), cv2.COLOR_BGR2RGB)
+        image = cv2.resize(image, (24, 72))
+        dataset_samples.append(image)
+        dataset_labels.append(label)
+
+red_samples, red_labels = [], []
+read_dataset_dir('dataset/simulator/red', 0, red_samples, red_labels)
+read_dataset_dir('dataset/udacity-sdc/red', 0, red_samples, red_labels)
+
+yellow_samples, yellow_labels = [], []
+read_dataset_dir('dataset/simulator/yellow', 1, yellow_samples, yellow_labels)
+read_dataset_dir('dataset/udacity-sdc/yellow', 1, yellow_samples, yellow_labels)
+
+green_samples, green_labels = [], []
+read_dataset_dir('dataset/udacity-sdc/green', 2, green_samples, green_labels)
+read_dataset_dir('dataset/simulator/green', 2, green_samples, green_labels)
+
+red_samples = np.array(red_samples)
+red_labels = np.array(red_labels)
+
+X_red_train, X_red_test, y_red_train, y_red_test = train_test_split(
+    red_samples,
+    red_labels,
+    test_size=0.05,
+    random_state=42
+)
+
+X_yellow_train, X_yellow_test, y_yellow_train, y_yellow_test = train_test_split(
+    yellow_samples,
+    yellow_labels,
+    test_size=0.05,
+    random_state=42
+)
+
+X_green_train, X_green_test, y_green_train, y_green_test = train_test_split(
+    green_samples,
+    green_labels,
+    test_size=0.05,
+    random_state=42
+)
+
+X_train = np.concatenate([X_red_train, X_yellow_train, X_green_train], axis=0)
+y_train = np.concatenate([y_red_train, y_yellow_train, y_green_train], axis=0)
+
+X_test = np.concatenate([X_red_test, X_yellow_test, X_green_test], axis=0)
+y_test = np.concatenate([y_red_test, y_yellow_test, y_green_test], axis=0)
 In [12]:
-def rgb_to_hsv(rgb_image):
-    """Converts RGB color space to HSV"""
-    
-    return cv2.cvtColor(rgb_image, cv2.COLOR_RGB2HSV)
+### Replace each question mark with the appropriate value.
 
+# Number of training examples
+n_train = X_train.shape [0]
 
-def flatten_3d_to_2d(vector_3d):
-    """Flattens 3D vector into 2D vector"""
-    
-    np_vector = np.array(vector_3d)
-    
-    return np_vector.reshape(-1, np_vector.shape[-1])
+# Number of testing examples.
+n_test = X_test.shape [0]
 
+# What's the shape of an traffic sign image?
+image_shape = X_train.shape [1:3]
 
-def mask_hsv_image(hsv_image, lower_value, upper_value, avg_sat):
-    """Masks image with specific saturation values"""
-    
-    # ranges of specific color in HSV
-    lower_value = np.array([lower_value, avg_sat, 140])
-    upper_value = np.array([upper_value, 245, 245])
-    
-    # Threshold the HSV image to get only specific colors
-    mask = cv2.inRange(hsv_image, lower_value, upper_value)
-    
-    # Bitwise-AND mask and HSV image
-    masked_hsv_image = cv2.bitwise_and(hsv_image, hsv_image, mask=mask)
-    
-    return masked_hsv_image
+# TODO: How many unique classes/labels there are in the dataset.
+n_classes = 3
 
+print("Number of training examples =", n_train)
+print("Number of testing examples =", n_test)
+print("Image data shape =", image_shape)
+print("Number of classes =", n_classes)
 
-def apply_saturation_masks(hsv_image):
-    """Applies saturation masks"""
-    
-    # Extract Saturation channel
-    s = hsv_image[:,:,1]
-    
-    # Average Saturation
-    avg_sat = np.average(s)
-    # Correction
-    avg_sat = int(avg_sat * 1.3)
-    
-    # Saturation masking
-    red_masked_image = mask_hsv_image(hsv_image, 150, 180, avg_sat)
-    green_masked_image = mask_hsv_image(hsv_image, 70, 100, avg_sat)
-    yellow_masked_image = mask_hsv_image(hsv_image, 10, 60, avg_sat)
-
-    return (red_masked_image, yellow_masked_image, green_masked_image)
-
-
-def feature_saturation(hsv_image):
-    """Creates a saturation feature using HSV color space"""
-    
-    saturation_layers = apply_saturation_masks(hsv_image)
-    
-    saturation_aggregation = []
-    for saturation_layer in saturation_layers:
-        saturation_aggregation.append(np.sum(list(map(lambda pixel: np.sum(pixel) != 0, flatten_3d_to_2d(saturation_layer)))))
-
-    return saturation_aggregation
-(QUESTION 1): How do the features you made help you distinguish between the 3 classes of traffic light images?
-Answer: Brightness feature helps to distinguish color based on assumption of light being more bright than the noise in the image. Saturation feature helps to distinguish between 3 classes in a way it applies pixel counters over masked images. On masked images there are mostly 0(black) pixels, so pixels with any other values count.
-
-4. Classification and Visualizing Error
-Using all of your features, write a function that takes in an RGB image and, using your extracted features, outputs whether a light is red, green or yellow as a one-hot encoded label. This classification function should be able to classify any image of a traffic light!
-
-You are encouraged to write any helper functions or visualization code that you may need, but for testing the accuracy, make sure that this estimate_label function returns a one-hot encoded label.
-
-
-(IMPLEMENTATION): Build a complete classifier
+train_memory_amount = n_train * (image_shape[0] * image_shape[1] * 3 + n_classes) / 1024 / 1024
+test_memory_amount = n_test * (image_shape[0] * image_shape[1] * 3 + n_classes) / 1024 / 1024
+all_memory_amount = train_memory_amount + test_memory_amount
+print("Train memory amount (Mb) =", train_memory_amount)
+print("Test memory amount (Mb) =", test_memory_amount)
+print("All memory amount (Mb) =", all_memory_amount)
+Number of training examples = 858
+Number of testing examples = 47
+Image data shape = (72, 24)
+Number of classes = 3
+Train memory amount (Mb) = 4.24427604675293
+Test memory amount (Mb) = 0.23249530792236328
+All memory amount (Mb) = 4.476771354675293
 In [13]:
-def estimate_label(rgb_image):
-    """Estimates label of a given traffic light RGB image"""
-    
-    # Standarization: -> Crop -> Resize
-    standarized_image = standardize_input(rgb_image)
-    
-    # Colorspace converstion: -> RGB -> HSV
-    hsv_image = rgb_to_hsv(standarized_image)
-    
-    # Extract features: -> Feature Brightness -> Feature Saturation
-    feature_bri = feature_brightness(hsv_image)
-    feature_sat = feature_saturation(hsv_image)
-    
-    # Feature combination formula
-    feature_combined = np.array(feature_bri) + 0.5 * np.array(feature_sat)
-    
-    
-    predicted_label = list(map(lambda x: x == max(feature_combined), feature_combined))
-    
-    return predicted_label
-Testing the classifier
-Here is where we test your classification algorithm using our test set of data that we set aside at the beginning of the notebook! This project will be complete once you've pogrammed a "good" classifier.
+### Data exploration visualization goes here.
+### Feel free to use as many code cells as needed.
+import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import ImageGrid
 
-A "good" classifier in this case should meet the following criteria (and once it does, feel free to submit your project):
+train_classes_sizes = [np.count_nonzero(y_train==i) for i in range (n_classes)] 
+test_classes_sizes = [np.count_nonzero(y_test==i) for i in range (n_classes)] 
 
-Get above 90% classification accuracy.
-Never classify a red light as a green light.
-Test dataset
-Below, we load in the test dataset, standardize it using the standardize function you defined above, and then shuffle it; this ensures that order will not play a role in testing accuracy.
+def show_images_in_grid (images, rows, cols):
+    fig = plt.figure (figsize=(5., 10.))
+    grid = ImageGrid(fig, 111,
+                     nrows_ncols=(rows, cols),
+                     axes_pad=0.1
+                     )
+    for i in range(len (images)):
+        grid[i].imshow(images [i])
+
+    plt.show()
+
+#table of traffic sign examples for diffetent classes
+im_pos = 0
+X_train_examples = []
+# num_of_examples = 10
+for i in range(n_classes):
+    X_train_examples.append (X_train [im_pos])
+    im_pos += train_classes_sizes [i]
+
+show_images_in_grid (X_train_examples, 1, n_classes)
+
+#counts of examples in each classes
+plt.figure ()
+plt_x = range (n_classes)
+train_classes_sizes = [np.count_nonzero(y_train==i) for i in range (n_classes)] 
+test_classes_sizes = [np.count_nonzero(y_test==i) for i in range (n_classes)] 
+plt.bar (plt_x, train_classes_sizes, color=(0.2588,0.4433,1.0))
+plt.bar (plt_x, test_classes_sizes, color=(1.0,0.5,0.62))
+plt.xlabel ('Traffic lights id')
+plt.ylabel ('Count')
+plt.title ('Traffic lights counts in each class train and test dataset')
+plt.show ()
+
+# Visualizations will be shown in the notebook.
+%matplotlib inline
+
 
 In [14]:
-# Using the load_dataset function in helpers.py
-# Load test data
-TEST_IMAGE_LIST = helpers.load_dataset(IMAGE_DIR_TEST)
+### Preprocess the data here.
+### Feel free to use as many code cells as needed.
 
-# Standardize the test data
-STANDARDIZED_TEST_LIST = standardize(TEST_IMAGE_LIST)
+#rescaling of pixel magnitudes
+X_train_preprocessed = np.divide(X_train, 255).astype (np.float32);
+X_test_preprocessed = np.divide(X_test, 255).astype (np.float32);
 
-# Shuffle the standardized test data
-random.shuffle(STANDARDIZED_TEST_LIST)
-Determine the Accuracy
-Compare the output of your classification algorithm (a.k.a. your "model") with the true labels and determine the accuracy.
+#dividing into train and validation dataset
 
-This code stores all the misclassified images, their predicted labels, and their true labels, in a list called MISCLASSIFIED. This code is used for testing and should not be changed.
+def shuffle_dataset (dataset_x, dataset_y):
+    assert len (dataset_x) == len (dataset_y)
+    p = np.random.permutation(len(dataset_x))
+    return dataset_x [p], dataset_y [p]
 
-In [15]:
-# Constructs a list of misclassified images given a list of test images and their labels
-# This will throw an AssertionError if labels are not standardized (one-hot encoded)
+def split_into_train_and_validation_dataset (dataset_x, dataset_y, train_proportion):
+    train_samples_by_classes = []
+    train_labels_by_classes = []
+    X_train_samples = np.zeros ((0, image_shape[0], image_shape[1], 3))
+    y_train_samples = np.zeros ((0,))
+    X_validation_samples = np.zeros ((0, image_shape[0], image_shape[1], 3))
+    y_validation_samples = np.zeros ((0,))
+    sample_index = 0
+    for class_size in train_classes_sizes:
+        train_samples_count = int(train_proportion * class_size)
 
-def get_misclassified_images(test_images):
-    # Track misclassified images by placing them into a list
-    misclassified_images_labels = []
+        #getting and shuffle one class samples
+        dataset_x_for_class = dataset_x[sample_index:sample_index + class_size]
+        dataset_y_for_class = dataset_y[sample_index:sample_index + class_size]
+        dataset_x_for_class, dataset_y_for_class = shuffle_dataset (dataset_x_for_class, dataset_y_for_class)
+        
+        #splitting to train and validation dataset
+        X_train_for_class = dataset_x_for_class[0:train_samples_count]
+        y_train_for_class = dataset_y_for_class[0:train_samples_count]
+        X_valid_for_class = dataset_x_for_class[train_samples_count:class_size]
+        y_valid_for_class = dataset_y_for_class[train_samples_count:class_size]
+        
+        #storing train samples by classes
+        #this will be used later to generate augmented dataset
+        train_samples_by_classes.append (X_train_for_class)
+        train_labels_by_classes.append (y_train_for_class)
+        
+        #storing samples in corresponding datasets
+        X_train_samples = np.concatenate((X_train_samples, X_train_for_class), axis=0)
+        y_train_samples = np.concatenate((y_train_samples, y_train_for_class), axis=0)
+        X_validation_samples = np.concatenate((X_validation_samples, X_valid_for_class), axis=0)
+        y_validation_samples = np.concatenate((y_validation_samples, y_valid_for_class), axis=0)
+        
+        sample_index += class_size
+        
+    return X_train_samples, y_train_samples, X_validation_samples, y_validation_samples, train_samples_by_classes, train_labels_by_classes
 
-    # Iterate through all the test images
-    # Classify each image and compare to the true label
-    for image in test_images:
+X_train_for_learning, \
+y_train_for_learning, \
+X_valid_for_learning, \
+y_valid_for_learning, \
+samples_by_classes, \
+labels_by_classes = split_into_train_and_validation_dataset (X_train_preprocessed, y_train, 0.8)
+In [21]:
+### Generate data additional data (OPTIONAL!)
+### and split the data into training/validation/testing sets here.
+### Feel free to use as many code cells as needed.
 
-        # Get true data
-        im = image[0]
-        true_label = image[1]
-        assert(len(true_label) == 3), "The true_label is not the expected length (3)."
+import random as rand
+import cv2    
 
-        # Get predicted label from your classifier
-        predicted_label = estimate_label(im)
-        assert(len(predicted_label) == 3), "The predicted_label is not the expected length (3)."
+# generate @generate_count images from given @images
+def augment_images (images, generate_count):
+    images_last_index = len (images) - 1
+    augmented = []
+    for i in range (generate_count):
+        im1 = images [rand.randint (0, images_last_index)]
+        
+        #rotation and scaling
+        Mrot = cv2.getRotationMatrix2D((16,16),rand.uniform(-5.0, 5.0), rand.uniform(0.95, 1.05))
 
-        # Compare true and predicted labels 
-        if(predicted_label != true_label):
-            # If these labels are not equal, the image has been misclassified
-            misclassified_images_labels.append((im, predicted_label, true_label))
-            
-    # Return the list of misclassified [image, predicted_label, true_label] values
-    return misclassified_images_labels
+        #affine transform and shifts
+        pts1 = np.float32([[0,0],[image_shape[1],0],[image_shape[1], image_shape[0]]])
+        a = 5;
+        shift = 8
+        shiftx = rand.randint (-shift, shift);
+        shifty = rand.randint (-shift, shift);
+        pts2 = np.float32([[
+                    0 + rand.randint (-a, a) + shiftx,
+                    0 + rand.randint (-a, a) + shifty
+                ],[
+                    image_shape[1] + rand.randint (-a, a) + shiftx,
+                    0 + rand.randint (-a, a) + shifty
+                ],[
+                    image_shape[1] + rand.randint (-a, a) + shiftx,
+                    image_shape[0] + rand.randint (-a, a) + shifty
+                ]])
+        M = cv2.getAffineTransform(pts1,pts2)
+        (h, w) = im1.shape[:2]
+
+        augmented_image = cv2.warpAffine(
+            cv2.warpAffine (
+                im1
+                , Mrot, (w, h)
+            )
+            , M, (w,h)
+        )
+        
+        augmented_image += rand.uniform(-0.2, 0.2)
+        np.clip(augmented_image, 0.0, 1.0, out=augmented_image)
+        
+        augmented.append (augmented_image)
+        
+    return augmented
+In [22]:
+#augmented dataset will be stored in this global variables
+X_train_augmented = np.zeros ((0, image_shape[0], image_shape[1], 3))
+y_train_augmented = np.zeros ((0,))
+
+#generate images up to 3000 images for each class
+#augmented dataset will contain only generated images
+augment_limit = 3000
+def augment_dataset ():
+    global X_train_augmented
+    global y_train_augmented
+    X_train_augmented = np.zeros ((0, image_shape[0], image_shape[1], 3))
+    y_train_augmented = np.zeros ((0,))
+    
+    for augmenting_index in range(n_classes):
+        samples = samples_by_classes [augmenting_index]
+        labels = labels_by_classes [augmenting_index]
+
+        augment_count = augment_limit
+        new_samples = augment_images (samples, augment_count)
+        y_train_augmented = np.concatenate((y_train_augmented, [augmenting_index for i in range (augment_count)]), axis=0)
+
+        X_train_augmented = np.concatenate((X_train_augmented, new_samples), axis=0)
+In [23]:
+#showing examples of augmented dataset
+show_images_in_grid ([X_train_for_learning [i] for i in range(3)], 1, 3)
+augment_dataset ()
+show_images_in_grid ([X_train_augmented [i] for i in range(0, n_classes * augment_limit, augment_limit)], 1, 3)
 
 
-# Find all misclassified images in a given test set
-MISCLASSIFIED = get_misclassified_images(STANDARDIZED_TEST_LIST)
+In [32]:
+### Define your architecture here.
+### Feel free to use as many code cells as needed.
 
-# Accuracy calculations
-total = len(STANDARDIZED_TEST_LIST)
-num_correct = total - len(MISCLASSIFIED)
-accuracy = num_correct/total
+import tensorflow as tf
+tf.reset_default_graph()
 
-print('Accuracy: ' + str(accuracy))
-print("Number of misclassified images = " + str(len(MISCLASSIFIED)) +' out of '+ str(total))
-Accuracy: 1.0
-Number of misclassified images = 0 out of 297
+batch_size = 128
 
-Visualize the misclassified images
-Visualize some of the images you classified wrong (in the MISCLASSIFIED list) and note any qualities that make them difficult to classify. This will help you identify any weaknesses in your classification algorithm.
+import math
+# I taken it from my solution to lab quiz
+def batches(batch_size, features, labels):
+    """
+    Create batches of features and labels
+    :param batch_size: The batch size
+    :param features: List of features
+    :param labels: List of labels
+    :return: Batches of (Features, Labels)
+    """
+    assert len(features) == len(labels)
+    batches_arr = []
+    num_full_batches = math.floor(len(features) / batch_size)
+    num_full_batches_samples = num_full_batches * batch_size
+    sample_index = 0
+    while (sample_index < num_full_batches_samples):
+        batches_arr.append ([features[sample_index:sample_index+batch_size], labels[sample_index:sample_index+batch_size]])
+        sample_index += batch_size
+    
+    if (num_full_batches_samples != len(features)):
+        left_samples = len(features) - num_full_batches_samples
+        batches_arr.append ([features[-left_samples:], labels[-left_samples:]])
+        
+    return batches_arr
 
-In [16]:
-# Unfortunately my algorithm produces no missclassified images :o
+#flat last convolution layer to use it in MLP network
+def flatten (batch):
+    flatten_size = np.prod(batch.get_shape().as_list()[1:])
+    return tf.reshape(batch, [-1, flatten_size]), flatten_size
 
-(Question 2): After visualizing these misclassifications, what weaknesses do you think your classification algorithm has? Please note at least two.
-Answer: Main weakness is that regions in saturation and brightness feature are typed by hand. Algorithm may fail with different set, where traffic lights images are not extracted properly.
+#generate CNN based on parameters
+def gen_model(cnn_input, cnn_weights, cnn_strides, cnn_nonlinearities, cnn_maxpooling, mlp_layers, mlp_nonlinearities):
 
-Test if you classify any red lights as green
-To pass this project, you must not classify any red lights as green! Classifying red lights as green would cause a car to drive through a red traffic light, so this red-as-green error is very dangerous in the real world.
+    cnn_layer_input = cnn_input
+    cnn_outputs = []
+    for W, s, n, p in zip(cnn_weights, cnn_strides, cnn_nonlinearities, cnn_maxpooling):
 
-The code below lets you test to see if you've misclassified any red lights as green in the test set. This test assumes that MISCLASSIFIED is a list of tuples with the order: [misclassified_image, predicted_label, true_label].
+        W_var = tf.Variable (tf.truncated_normal(W, stddev=0.01))
+        cnn_layer_input = tf.nn.conv2d (cnn_layer_input, W_var, strides=s, padding='SAME')
 
-Note: this is not an all encompassing test, but its a good indicator that, if you pass, you are on the right track! This iterates through your list of misclassified examples and checks to see if any red traffic lights have been mistakenly labelled [0, 1, 0] (green).
+        b_var = tf.Variable(tf.zeros(W[3]))
+        cnn_layer_input = tf.nn.bias_add(cnn_layer_input, b_var)
 
-In [17]:
-# Importing the tests
-import test_functions
-tests = test_functions.Tests()
+        cnn_layer_input = n (cnn_layer_input)
 
-if(len(MISCLASSIFIED) > 0):
-    # Test code for one_hot_encode function
-    tests.test_red_as_green(MISCLASSIFIED)
-else:
-    print("MISCLASSIFIED may not have been populated with images.")
-MISCLASSIFIED may not have been populated with images.
-5. Improve your algorithm!
-Submit your project after you have completed all implementations, answered all questions, AND when you've met the two criteria:
+        cnn_layer_input = tf.nn.max_pool(cnn_layer_input, ksize=[1, p[0], p[1], 1], strides=[1, p[0], p[1], 1], padding='SAME')
+        cnn_outputs.append (cnn_layer_input)
 
-Greater than 90% accuracy classification
-No red lights classified as green
-If you did not meet these requirements (which is common on the first attempt!), revisit your algorithm and tweak it to improve light recognition -- this could mean changing the brightness feature, performing some background subtraction, or adding another feature!
+    cnn_output_flatten_pre, cnn_output_flatten_pre_size = flatten (cnn_outputs[-2])
+    cnn_output_flatten, cnn_output_flatten_size = flatten (cnn_layer_input)
+    #print last and previous conv layers flatten sizes, just for information
+    print ("cnn pre: ", cnn_output_flatten_pre_size)
+    print ("cnn: ", cnn_output_flatten_size)
+    
+    mlp_input = tf.concat ([cnn_output_flatten_pre, cnn_output_flatten], 1)
+    mlp_input_size = cnn_output_flatten_pre_size + cnn_output_flatten_size
+    
+    mlp_layers.insert(0, mlp_input_size)
+    for i in range(len(mlp_layers)-1):
+        W_var = tf.Variable (tf.truncated_normal([mlp_layers[i], mlp_layers[i+1]], stddev=0.01))
+        b_var = tf.Variable(tf.zeros(mlp_layers[i+1]))
+        mlp_input =  mlp_nonlinearities [i] (tf.matmul (mlp_input, W_var) + b_var)
 
-Going Further (Optional Challenges)
-If you found this challenge easy, I suggest you go above and beyond! Here are a couple optional (meaning you do not need to implement these to submit and pass the project) suggestions:
+    return mlp_input
 
-(Optional) Aim for >95% classification accuracy.
-(Optional) Some lights are in the shape of arrows; further classify the lights as round or arrow-shaped.
-(Optional) Add another feature and aim for as close to 100% accuracy as you can get!
+#parameters of the CNN
+cnn_input = tf.placeholder (tf.float32, shape=(None, image_shape[0], image_shape[1], 3), name='input_image')
+cnn_layers = [[5, 5, 3, 16], [5, 5, 16, 32], [5, 5, 32, 32], [5, 5, 32, 32]] #conv size x, conv size y, in channels, out channels
+cnn_strides = [[1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1], [1, 1, 1, 1]] #1, stride x, stride y, 1
+cnn_pooling = [[2, 2], [2, 2], [2, 2], [2, 2]]
+cnn_nonlinearities = [tf.nn.relu, tf.nn.relu, tf.nn.relu, tf.nn.relu]
+
+#parameters of MLP
+mlp_layers = [256, n_classes]
+mlp_nonlinearities = [tf.nn.tanh, tf.identity]
+
+model = gen_model (cnn_input, cnn_layers, cnn_strides, cnn_nonlinearities, cnn_pooling, mlp_layers, mlp_nonlinearities)
+model = tf.identity(model, name='model_output')
+cnn pre:  864
+cnn:  320
+In [33]:
+y_correct = tf.placeholder (tf.int32, shape=(None,))
+Y_batch_onehot = tf.one_hot (y_correct, n_classes)
+
+loss_op = tf.reduce_mean(tf.nn.softmax_cross_entropy_with_logits(logits=model, labels=Y_batch_onehot))
+opt = tf.train.AdamOptimizer(learning_rate=0.0005)
+train_op = opt.minimize(loss_op)
+correct_prediction = tf.equal(tf.argmax(model, 1), tf.argmax(Y_batch_onehot, 1))
+accuracy_op = tf.reduce_mean(tf.cast(correct_prediction, tf.float32))
+
+epochs = 10
+
+#test given dataset with model
+def test_dataset (dataset_x, dataset_y):
+    test_loss = 0
+    test_acc = 0
+    test_num_batches = 0
+    for X_batch, Y_batch in batches (batch_size, dataset_x, dataset_y):
+        loss_val_test, acc_val_test = sess.run ([loss_op, accuracy_op], feed_dict={cnn_input: X_batch, y_correct: Y_batch})
+        test_loss += loss_val_test
+        test_acc += acc_val_test
+        test_num_batches += 1
+
+    test_loss /= test_num_batches
+    test_acc /= test_num_batches
+    return test_loss, test_acc
+
+saver = tf.train.Saver ()
+
+with tf.Session () as sess:
+    sess.run (tf.global_variables_initializer())
+    
+    for i in range (epochs):
+    
+        #generate and shuffling new training samples for each epoch 
+        augment_dataset ()
+        train_dataset_x, train_dataset_y = shuffle_dataset (X_train_augmented, y_train_augmented)
+
+        #train only on generated samples
+        for X_batch, Y_batch in batches (batch_size, train_dataset_x, train_dataset_y):
+            loss_val, acc_val, _ = sess.run ([loss_op, accuracy_op, train_op], feed_dict={cnn_input: X_batch, y_correct: Y_batch})
+                
+
+        train_loss, train_acc = test_dataset (X_train_for_learning, y_train_for_learning)
+        valid_loss, valid_acc = test_dataset (X_valid_for_learning, y_valid_for_learning)
+        
+        print (i," train loss: ", train_loss, " acc: ", train_acc, " valid loss: ", valid_loss, " acc: ", valid_acc)
+
+    #testing against test.p
+    test_loss, test_acc = test_dataset (X_test_preprocessed, y_test)
+    print ("test loss: ", test_loss, " acc: ", test_acc)
+    
+    saver.save (sess, 'tf-saves/cnn.ckpt')
+0  train loss:  0.0106467353956  acc:  1.0  valid loss:  0.0190348098986  acc:  1.0
+1  train loss:  0.00312913395464  acc:  1.0  valid loss:  0.00534220412374  acc:  1.0
+2  train loss:  0.00190006530223  acc:  1.0  valid loss:  0.00232044816948  acc:  1.0
+3  train loss:  0.00118949143022  acc:  1.0  valid loss:  0.00123957928736  acc:  1.0
+4  train loss:  0.00357184169601  acc:  1.0  valid loss:  0.00318866182351  acc:  1.0
+5  train loss:  0.000373642246511  acc:  1.0  valid loss:  0.000490852122311  acc:  1.0
+6  train loss:  0.00172160847675  acc:  1.0  valid loss:  0.00310712239298  acc:  1.0
+7  train loss:  0.000666828622343  acc:  1.0  valid loss:  0.000579707906581  acc:  1.0
+8  train loss:  0.00131400483709  acc:  1.0  valid loss:  0.00116837240057  acc:  1.0
+9  train loss:  0.000499957569749  acc:  1.0  valid loss:  0.000456910551293  acc:  1.0
+test loss:  0.000315460929414  acc:  1.0
+In [ ]:
